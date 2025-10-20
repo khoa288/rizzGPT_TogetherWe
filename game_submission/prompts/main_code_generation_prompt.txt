@@ -1,0 +1,733 @@
+**Role:** You are a senior front-end engineer and game designer.
+
+**Goal:** Implement a **framework-free**, production-quality web game named **TogetherWe** that runs **directly** by opening an HTML file (suitable for GitHub Pages). **Do not** use React/Vue/Svelte or any bundlers, compilers, or Node tooling. The app must be entirely static assets.
+
+---
+
+## 0) Deliverables
+
+Output **all code** as separate code blocks, each with a filename header. Follow this exact file structure:
+
+```
+/ (project root)
+  index.html                # Menu (landing)
+  laugh.html                # Laugh mode
+  shake.html                # Shake mode
+  scoreboard.html           # Local leaderboard (both modes)
+  about.html                # Social-impact framing + references
+  /css/
+    styles.css              # Site-wide Tailwind layer + custom CSS
+  /js/
+    core.js                 # shared utils (UI, storage, permissions, helpers)
+    ui.js                   # navigation, animations, effects, toasts
+    laugh.js                # mic + YAMNet logic (MediaPipe Tasks Audio via CDN)
+    shake.js                # DeviceMotion logic (iOS+Android)
+    scoreboard.js           # read/render local leaderboards
+  /assets/
+    logo.svg
+    bg-noise.png
+    confetti.svg
+    icons/*.svg
+```
+
+Also include a concise **README.md** (as a final code block) covering:
+
+* Concept & social-impact framing (Vietnam & Australia) with inline citations
+* How to run (open `index.html`; sensors require HTTPS or [http://localhost](http://localhost))
+* Browser/mobile notes (iOS motion permission flow, mic prompts)
+* Privacy disclaimer (all processing on-device; no data leaves the browser)
+* Credits & references
+
+---
+
+## 1) Non-negotiable constraints
+
+* **No frameworks & no build tools.** Only vanilla HTML/CSS/JS.
+* **Static only.** Must run by opening HTML locally or via GitHub Pages.
+* **Modular code.** Put shared logic in `/js/*` and site-wide CSS in `/css/styles.css`.
+* **Tailwind via CDN only** (`<script src="https://cdn.tailwindcss.com"></script>`). Configure theme colors in an inline `tailwind.config` script within each HTML page.
+* **MediaPipe Tasks Audio (YAMNet)** via CDN (jsDelivr with fallback to unpkg). Use TFLite YAMNet from TF Hub; provide fallback GCS model URL.
+* **Permissions:**
+
+  * Microphone (Laugh)
+  * Device Motion (Shake) including `DeviceMotionEvent.requestPermission()` on iOS
+* **HTTPS requirement:** show a compact “Secure/Origin/Permission” status line on mode pages.
+* **Accessibility:** keyboard navigable, ARIA labels, focus states, color-contrast ≥ 4.5:1, `prefers-reduced-motion` support.
+* **Performance:** avoid layout thrash, use `requestAnimationFrame` for UI, passive listeners, minimal GC pressure, and micro-optimized loops.
+
+---
+
+## 2) Core gameplay (simple but polished)
+
+### Shared UI spec (Menu + mode pages)
+
+* **Title:** `TogetherWe`
+* Under title: two prominent buttons: **Laugh** and **Shake** (act as tabs on `index.html`, and as nav buttons on mode pages).
+* Compact control panel on mode pages: `Start 10s`, `Stop`, `Play Again`, status text, small “Secure/Origin/Permission” line.
+* **Score entry:** after each round, prompt for player display name and save score to a **local scoreboard** per mode (`localStorage`, top-10).
+* **Meters:**
+
+  * **Laugh:** `RMS`, `Laughter %`, `JoyRank`
+  * **Shake:** `acc`, `rot`, `ShakeRank`
+* **Special effects:**
+
+  * subtle confetti burst when a player hits a personal best
+  * glow pulse on meters when thresholds exceeded
+  * respect `prefers-reduced-motion` to disable effects
+
+### Laugh mode (microphone + YAMNet)
+
+* After permission & a 2-second **quiet calibration** for baseline RMS, `Start 10s` runs the round.
+* **Classification:** use MediaPipe Tasks Audio with **YAMNet** at 16 kHz; aggregate categories whose names include `"laugh"`, `"giggle"`, `"chuckle"`, `"snicker"`, `"chortle"`.
+* **Scoring (JoyRank):**
+
+  * per-tick probability `p ∈ [0,1]` from aggregated laughter categories
+  * **base** = `100 * mean(p)`
+  * **penalty** = `15 * loudPenalty` where `loudPenalty` accumulates when RMS exceeds calibrated threshold (anti-“shout” fairness)
+  * **bonus** = `+2 per sustained 1s streak` where `p ≥ 0.6` across ~1s windows
+  * `JoyRank = round(max(0, base - penalty + bonus))`
+* Update meters at ~4 Hz (EMA smoothing for `Laughter %`).
+* On finish, save `JoyRank` with timestamp/name to `scores_laugh` (top-10).
+
+### Shake mode (phone motion sensors)
+
+* Request motion permission on iOS.
+* Listen to `devicemotion` with passive handler; compute:
+
+  * linear acceleration magnitude `acc` (fall back to `accelerationIncludingGravity` and subtract `g`)
+  * rotation rate magnitude `rot` (deg/s)
+* Integrate energies: `accE += (a²)*dt`, `rotE += (ω²)*dt` (ω in rad/s).
+* **ShakeRank = round(6*accE + 2*rotE)`**
+* Update meters live at ~60 FPS; 10s duration; save `ShakeRank` to `scores_shake` (top-10).
+* If on desktop / no sensors, show graceful warning and a demo animation.
+
+> **Important:** Reuse the known-good logic that you’re given below in §6 (“Validated core logic”)—match formulas, calibration, permission flow, smoothing, and CDNs.
+
+---
+
+## 3) Visual & interaction design
+
+* **Look & feel:** calm, hopeful, joyful. Use a soft, modern palette and large, friendly typography.
+
+  * Suggested palette: Indigo, Sky, Emerald accents, warm Yellow for celebrations.
+  * Use rounded corners (`rounded-2xl`), soft shadows, and generous spacing.
+* **Layouts:** responsive grid with a max width around 960px; sticky footer links to modes + scoreboard + about.
+* **Micro-interactions:**
+
+  * Button press ripple (CSS only)
+  * Meter bars with smooth width transitions
+  * Confetti SVG burst (disable when `prefers-reduced-motion`)
+* **Icons:** lightweight inline SVGs for mic, shake/phone, timer, trophy, info.
+* **Copy tone:** encouraging, non-judgmental, celebrates small wins.
+
+---
+
+## 4) Pages: content & behavior
+
+### `index.html` (Menu)
+
+* Title, short tagline explaining the **two modes** and that scores are stored locally.
+* Big buttons → `laugh.html`, `shake.html`.
+* Footer links: Scoreboard, About, Privacy note (inline).
+
+### `laugh.html`
+
+* Top bar with Back to Menu.
+* Meters: `RMS`, `Laughter %`, `JoyRank`.
+* Control buttons: Start/Stop/Play Again, status text.
+* “Secure/Origin/Permission” line.
+* Name field + Save name.
+* Debug collapsible (`<details>`).
+* Use EMA smoothing and calibration as specified.
+
+### `shake.html`
+
+* Same structure; meters for `acc`, `rot`, `ShakeRank`.
+* iOS permission prompt path with visible status.
+* Show a “No motion data detected” warning after 2s if needed.
+
+### `scoreboard.html`
+
+* Renders **two tables**: Laugh and Shake (each top-10).
+* Columns: rank, name, score, relative time (e.g., “2h ago”).
+* Safe HTML escaping for names.
+
+### `about.html`
+
+* Purpose: **raise awareness** of youth mental-health burdens and barriers in **Vietnam** and **Australia**, and show how **laughter** and **movement** help mood and anxiety.
+* Keep copy concise, neutral, and **cite** statements with inline numeric references like `[1]`.
+* Include a compact references section with the exact sources from §5 below.
+* Add a small “This is not medical advice” note and encourage seeking professional support.
+
+---
+
+## 5) Research-backed content pack (for About page & UI copy)
+
+Use these facts to craft the About page (attribute with inline citations [1–8]):
+
+* **Vietnam:** 1 in 5 adolescents (21.7%) reported a mental health problem in the past 12 months; anxiety 18.6%, depression 4.3%. Service access was ~8.4% among those with a problem. **Source:** Viet Nam Adolescent Mental Health Survey (2023). ([qcmhr.org][1])
+* **Vietnam (general):** Earlier estimates reported 14.2% prevalence across 10 common mental disorders (2014 National Mental Hospital). ([World Health Organization][2])
+* **Australia:** ~1 in 5 Australians (22%) aged 16–85 experienced a mental disorder in the past year (2020–22). Anxiety 17%, affective disorders 8%. **Source:** AIHW (updated May 20, 2025) and ABS study. ([AIHW][3])
+* **Exercise helps:** Large, recent reviews show **exercise is an effective treatment for depression**, with stronger effects for **brisk aerobic activity, yoga, and strength training**; benefits are broad and well-tolerated. ([PubMed][4])
+* **Laughter helps:** Meta-analyses indicate **laughter/humor interventions reduce depression and anxiety** (various adult populations; effect sizes vary; more rigorous RCTs encouraged). ([PubMed][5])
+* **Tech feasibility:** **MediaPipe Audio Classifier / YAMNet** classifies audio events in real time in the browser (WebAssembly), allowing aggregation of laughter-related categories. ([Google AI for Developers][6])
+
+> **Citations to list on About page**
+> [1] V-NAMHS report (2023) — adolescent prevalence in Vietnam. ([qcmhr.org][1])
+> [2] WHO Vietnam mental health page (context). ([World Health Organization][2])
+> [3] AIHW mental health prevalence (Australia, 2025). ([AIHW][3])
+> [4] ABS National Study (method & summary). ([Australian Bureau of Statistics][7])
+> [5] BMJ 2024 umbrella review on exercise for depression. ([BMJ][8])
+> [6] 2024 meta-analysis on exercise effectiveness (PubMed abstract). ([PubMed][4])
+> [7] 2019 meta-analysis on laughter & humour interventions. ([PubMed][5])
+> [8] MediaPipe Audio Classifier (docs) + YAMNet tutorial. ([Google AI for Developers][6])
+
+Keep claims measured; avoid medical advice; position the game as **micro-boosts** to mood and connection.
+
+---
+
+## 6) Validated core logic (must implement)
+
+**Use this known-good logic (matching formulas, permission flows, calibration, smoothing, and CDNs).** You are provided working, error-free code for both modes (“Laugh & Shake — Local Scoreboards (100% in-browser)”) that includes:
+
+* Mic 16 kHz pipeline, 2-s baseline calibration, RMS meter, YAMNet classification via MediaPipe Tasks Audio (with jsDelivr→unpkg fallback, TF Hub→GCS fallback), EMA smoothing, streak bonuses, loudness penalty.
+* Motion pipeline with iOS permission request, integrated energy for `accE` and `rotE`, and the score `ShakeRank = round(6*accE + 2*rotE)`.
+* Robust localStorage scoreboard (top-10 per mode), name validation, safe HTML escaping, “time-ago” rendering, and clean UI status handling.
+
+**Your task:** Split that logic into `/js/laugh.js`, `/js/shake.js`, `/js/core.js`, and `/js/scoreboard.js`, wire it cleanly to the new multi-page structure, and improve the aesthetics and accessibility per this prompt.
+
+---
+
+## 7) Storage, privacy, and security
+
+* Store only `{ name, score, ts }` locally under keys `scores_laugh` and `scores_shake`.
+* **No network calls** beyond CDNs for libraries/models.
+* Show a small privacy line: “All audio and motion processing happens on-device. Scores stay on this device.”
+* Warn if not secure context; guide users to use HTTPS or `http://localhost`.
+
+---
+
+## 8) UX polish & edge cases
+
+* Disable Start while a round is running; enable Stop and Play Again appropriately.
+* Surface permission statuses and actionable errors.
+* Desktop on Shake → show “no motion data” notice with a gentle demo animation.
+* Confetti only on personal best.
+* Handle `prefers-reduced-motion: reduce` to tone down animations.
+* Safe guards for unavailable mic or blocked autoplay contexts.
+* Avoid mixing `innerHTML` with user strings; escape names.
+
+---
+
+## 9) Testing checklist (bake into README)
+
+* Chrome (desktop), Safari (iOS 16+), Chrome (Android).
+* iOS motion permission prompt workflow.
+* HTTPS requirement tripwire and messaging.
+* YAMNet model fallback if TF Hub blocked.
+* Scoreboard persistence across reloads; name validation.
+* Performance: main thread smooth at 60fps on Shake, ~4Hz updates on Laugh.
+
+---
+
+## 10) Asset requests (placeholders welcome)
+
+Tell the user to provide these (use placeholder assets but document how to replace):
+
+* `/assets/logo.svg` — simple wordmark with smile curve
+* `/assets/bg-noise.png` — subtle noise texture (repeatable)
+* `/assets/confetti.svg` — small vector shards for bursts
+* `/assets/icons/` — `mic.svg`, `phone.svg`, `timer.svg`, `trophy.svg`, `info.svg`
+
+---
+
+## 11) Code quality
+
+* Modern, readable vanilla JS with JSDoc comments for public functions.
+* Small functions; early returns; no magic numbers (use named constants).
+* Avoid global leakage; use ES modules (`type="module"`).
+* Semantically structured HTML; descriptive landmarks; alt text for decorative images as empty `alt=""`.
+* Tailwind utility classes for layout; minimal custom CSS in `styles.css`.
+* No console noise in production—only behind a `<details>` Debug area.
+
+---
+
+## 12) What to output
+
+Provide **all five HTML pages**, the **CSS**, and all **JS modules**, plus the **README.md**, each as separate code blocks with filenames.
+
+Make it production-clean, attractive, and accessible—so I can drop it into GitHub Pages and it just works.
+
+
+Importantly, for the logic for the shake and laugh follow this
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Laugh & Shake — Local Scoreboards (100% in-browser)</title>
+<style>
+  :root { --fg:#0f172a; --muted:#64748b; --ok:#16a34a; --bad:#ef4444; --warn:#eab308; --line:#e2e8f0; }
+  html,body{margin:0;padding:0;background:#fff;color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:920px;margin:24px auto;padding:0 16px}
+  h1{margin:0 0 8px}
+  p.muted{color:var(--muted)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .panel{border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-top:12px}
+  input,button{font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid #cbd5e1;background:#f8fafc}
+  button.primary{background:#111827;color:#fff;border-color:#111827;cursor:pointer}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  .tabs{display:flex;gap:8px;margin-top:8px}
+  .tab{padding:8px 12px;border:1px solid #cbd5e1;border-radius:999px;background:#f8fafc;cursor:pointer}
+  .tab.active{background:#111827;color:#fff;border-color:#111827}
+  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)} .muted2{color:#94a3b8}
+  .bar{height:14px;background:#e5e7eb;border-radius:999px;overflow:hidden;width:420px;max-width:100%}
+  .fill{height:100%;width:0%;background:linear-gradient(90deg,#93c5fd,#2563eb);transition:width .12s linear}
+  .fill.green{background:linear-gradient(90deg,#86efac,#16a34a)}
+  .fill.yellow{background:linear-gradient(90deg,#fde68a,#f59e0b)}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{padding:8px 6px;border-bottom:1px solid #eef2f7;text-align:left}
+  details{margin-top:8px}
+  pre{background:#0b1220;color:#e5e7eb;padding:.75rem 1rem;border-radius:.5rem;overflow:auto;max-height:200px}
+</style>
+
+<div class="wrap">
+  <h1>Laugh & Shake — Local Scoreboards</h1>
+  <p class="muted">Choose a mode. Run a 10-second round. Your **personal bests** (per mode) are saved locally on this device/browser.</p>
+
+  <div class="panel">
+    <div class="row">
+      <label for="name">Display name</label>
+      <input id="name" maxlength="16" placeholder="1–16 letters, numbers, _ or space" />
+      <button id="saveName" class="primary">Save name</button>
+      <span id="nameStatus" class="muted"></span>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-mode="laugh">Laugh (mic)</button>
+      <button class="tab" data-mode="shake">Shake (motion)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <button id="start" class="primary">Start 10s</button>
+      <button id="stop" disabled>Stop</button>
+      <button id="again" disabled>Play Again</button>
+      <span id="status" class="muted">Idle.</span>
+    </div>
+
+    <!-- Shared meters -->
+    <div id="laughMeters">
+      <div class="row" style="margin:.6rem 0 0.8rem">
+        <div class="bar"><div id="rmsBar" class="fill"></div></div>
+        <span class="mono" id="rmsTxt">RMS 0.000</span>
+      </div>
+      <div class="row" style="margin:.2rem 0 0.8rem">
+        <div class="bar"><div id="laughBar" class="fill green"></div></div>
+        <span class="mono" id="laughTxt">Laughter 0.0%</span>
+      </div>
+      <div class="row" style="margin:.2rem 0 0.8rem">
+        <div class="bar"><div id="happyBar" class="fill yellow"></div></div>
+        <span class="mono" id="happyTxt">JoyRank 0</span>
+      </div>
+    </div>
+
+    <div id="shakeMeters" style="display:none">
+      <div class="row" style="margin:.6rem 0 0.8rem">
+        <div class="bar"><div id="accBar" class="fill green"></div></div>
+        <span class="mono" id="accTxt">acc 0.00 m/s²</span>
+      </div>
+      <div class="row" style="margin:.2rem 0 0.8rem">
+        <div class="bar"><div id="rotBar" class="fill"></div></div>
+        <span class="mono" id="rotTxt">rot 0.0 °/s</span>
+      </div>
+      <div class="row" style="margin:.2rem 0 0.8rem">
+        <div class="bar"><div id="shakeBar" class="fill yellow"></div></div>
+        <span class="mono" id="shakeTxt">ShakeRank 0</span>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:.2rem">
+      <div class="mono muted">Time: <span id="t">0.0</span>s</div>
+      <div class="mono muted">Secure: <span id="secure"></span> · Origin: <span id="origin"></span></div>
+      <div class="mono muted" id="permInfo"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <strong>🎯 Your Local Scoreboard — <span id="boardTitle">Laugh</span></strong>
+    <table>
+      <thead><tr><th>#</th><th>Name</th><th class="mono">Score</th><th class="mono">When</th></tr></thead>
+      <tbody id="scoresBody"><tr><td colspan="4" class="muted">No scores yet.</td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>Debug</summary>
+    <pre id="log" class="mono"></pre>
+  </details>
+</div>
+
+<!-- MediaPipe Tasks Audio (CDN, with fallback handled in JS) -->
+<script type="module">
+/* ========= utilities & UI ========= */
+const $ = s => document.querySelector(s);
+const log = m => ($('#log').textContent += m + "\n");
+
+const isSecure = () => window.isSecureContext || location.protocol === "https:" ||
+                       location.hostname === "localhost" || location.hostname === "127.0.0.1";
+$("#origin").textContent = location.origin;
+$("#secure").textContent = isSecure() ? "yes" : "no";
+
+function setStatus(msg, cls="muted"){ const s=$("#status"); s.textContent=msg; s.className=cls; }
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function timeAgo(ts){
+  const s = Math.floor((Date.now()- (ts||0))/1000);
+  if (s < 60) return s + "s ago"; const m = Math.floor(s/60); if (m<60) return m+"m ago";
+  const h=Math.floor(m/60); if (h<24) return h+"h ago"; const d=Math.floor(h/24); return d+"d ago";
+}
+
+/* ========= name & local scores ========= */
+const nameInput=$("#name"), nameStatus=$("#nameStatus");
+nameInput.value = localStorage.getItem("playerName") || "";
+$("#saveName").onclick = () => {
+  const n = sanitizeName(nameInput.value);
+  if (!n) { nameStatus.textContent="Enter 1–16 characters (A–Z, a–z, 0–9, space, _)"; nameStatus.className="bad"; return; }
+  localStorage.setItem("playerName", n);
+  nameStatus.textContent="Saved."; nameStatus.className="muted";
+};
+
+function sanitizeName(s){
+  s=(s||"").trim();
+  return /^[A-Za-z0-9_ ]{1,16}$/.test(s) ? s : "";
+}
+
+function loadScores(mode){
+  try { return JSON.parse(localStorage.getItem("scores_"+mode) || "[]"); } catch { return []; }
+}
+function saveScore(mode, name, score){
+  const arr = loadScores(mode);
+  arr.push({ name, score, ts: Date.now() });
+  arr.sort((a,b)=> (b.score||0)-(a.score||0));
+  const top = arr.slice(0, 10);
+  localStorage.setItem("scores_"+mode, JSON.stringify(top));
+  renderScores(mode);
+}
+function renderScores(mode){
+  const body = $("#scoresBody");
+  const arr = loadScores(mode);
+  body.innerHTML = "";
+  if (!arr.length){ body.innerHTML = `<tr><td colspan="4" class="muted">No scores yet.</td></tr>`; return; }
+  arr.forEach((row,i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(row.name||"")}</td><td class="mono">${row.score||0}</td><td class="mono">${timeAgo(row.ts||Date.now())}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+/* ========= mode tabs ========= */
+let MODE = "laugh";
+const tabs = document.querySelectorAll(".tab");
+tabs.forEach(t => t.onclick = () => {
+  tabs.forEach(x=>x.classList.remove("active")); t.classList.add("active");
+  MODE = t.dataset.mode;
+  $("#boardTitle").textContent = MODE[0].toUpperCase() + MODE.slice(1);
+  $("#laughMeters").style.display = (MODE==="laugh") ? "" : "none";
+  $("#shakeMeters").style.display = (MODE==="shake") ? "" : "none";
+  renderScores(MODE);
+  setStatus("Idle.");
+  $("#again").disabled = true; $("#stop").disabled = true; $("#start").disabled = false;
+});
+renderScores(MODE);
+
+/* ========= shared round ctrl ========= */
+let running=false;
+$("#start").onclick = async () => {
+  if (!isSecure()){ alert("Needs HTTPS or http://localhost."); return; }
+  const n = sanitizeName(nameInput.value || localStorage.getItem("playerName"));
+  if (!n){ nameStatus.textContent="Save a valid name first."; nameStatus.className="bad"; return; }
+
+  $("#start").disabled = true; $("#again").disabled = true; $("#stop").disabled = false;
+  $("#t").textContent = "0.0";
+  $("#permInfo").textContent = "";
+
+  try {
+    if (MODE === "laugh") await startLaughRound(n);
+    else await startShakeRound(n);
+  } catch (e){
+    console.error(e);
+    setStatus(e.message || "Could not start.", "bad");
+    $("#start").disabled=false; $("#stop").disabled=true; $("#again").disabled=false;
+  }
+};
+
+$("#stop").onclick = () => stopRound();
+$("#again").onclick = () => {
+  $("#start").disabled=false; $("#again").disabled=true; $("#stop").disabled=true;
+  setStatus("Ready.");
+  resetMeters();
+};
+
+function stopRound(){
+  running=false;
+  cleanupLaugh();
+  cleanupShake();
+  $("#stop").disabled = true; $("#again").disabled = false;
+  setStatus("Stopped.");
+}
+function resetMeters(){
+  $("#rmsBar").style.width="0%"; $("#rmsTxt").textContent="RMS 0.000";
+  $("#laughBar").style.width="0%"; $("#laughTxt").textContent="Laughter 0.0%";
+  $("#happyBar").style.width="0%"; $("#happyTxt").textContent="JoyRank 0";
+  $("#accBar").style.width="0%"; $("#accTxt").textContent="acc 0.00 m/s²";
+  $("#rotBar").style.width="0%"; $("#rotTxt").textContent="rot 0.0 °/s";
+  $("#shakeBar").style.width="0%"; $("#shakeTxt").textContent="ShakeRank 0";
+  $("#t").textContent="0.0";
+  $("#log").textContent="";
+}
+
+/* ========================= L A U G H  (mic + YAMNet via MediaPipe) ========================= */
+const JSDELIVR = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-audio@0.10.20";
+const UNPKG    = "https://unpkg.com/@mediapipe/tasks-audio@0.10.20";
+const WASM_DIR = "/wasm";
+const MODEL_PRIMARY  = "https://tfhub.dev/google/lite-model/yamnet/classification/tflite/1?lite-format=tflite";
+const MODEL_FALLBACK = "https://storage.googleapis.com/mediapipe-models/audio_classifier/yamnet/float32/1/yamnet.tflite";
+
+let audioClassifier=null, laughCtx=null, analyser=null, meterBuf=null, rafId=0, procNode=null;
+let ring=null, ridx=0, need=0;
+const EMA_ALPHA = 0.2; let emaPct=0;
+let baseRMS=0;
+
+function laughLabel(name){
+  const n=name.toLowerCase();
+  return n.includes("laugh")||n.includes("giggl")||n.includes("chuckle")||n.includes("chortle")||n.includes("snicker");
+}
+
+async function importTasksAudio(){
+  try{ log("Loading @mediapipe/tasks-audio from jsDelivr…"); return await import(JSDELIVR); }
+  catch{ log("Falling back to unpkg…"); return await import(UNPKG); }
+}
+async function ensureClassifier(){
+  if (audioClassifier) return;
+  const { FilesetResolver, AudioClassifier } = await importTasksAudio();
+  let fileset;
+  try{ fileset = await FilesetResolver.forAudioTasks(JSDELIVR + WASM_DIR); }
+  catch{ fileset = await FilesetResolver.forAudioTasks(UNPKG + WASM_DIR); }
+  try {
+    audioClassifier = await AudioClassifier.createFromOptions(fileset, { baseOptions:{ modelAssetPath: MODEL_PRIMARY }, runningMode:"AUDIO_CLIPS" });
+    log("Model loaded from tfhub.");
+  } catch {
+    audioClassifier = await AudioClassifier.createFromOptions(fileset, { baseOptions:{ modelAssetPath: MODEL_FALLBACK }, runningMode:"AUDIO_CLIPS" });
+    log("Model loaded from GCS.");
+  }
+}
+
+function startRmsMeter(source){
+  analyser = laughCtx.createAnalyser(); analyser.fftSize = 1024;
+  meterBuf = new Float32Array(analyser.fftSize);
+  source.connect(analyser);
+  const tick = () => {
+    analyser.getFloatTimeDomainData(meterBuf);
+    let s=0; for (let i=0;i<meterBuf.length;i++) s+=meterBuf[i]*meterBuf[i];
+    const rms = Math.sqrt(s/meterBuf.length);
+    $("#rmsTxt").textContent = "RMS " + rms.toFixed(3);
+    $("#rmsBar").style.width = Math.min(100, rms*200) + "%";
+    rafId = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function cleanupLaugh(){
+  try{ procNode && procNode.disconnect(); }catch{}
+  try{ analyser && analyser.disconnect(); }catch{}
+  cancelAnimationFrame(rafId);
+  try{ laughCtx && laughCtx.close(); }catch{}
+  procNode=null; analyser=null; laughCtx=null; audioClassifier && (audioClassifier=null); // leave null so re-init if needed
+}
+
+async function startLaughRound(playerName){
+  setStatus("Preparing mic…");
+  await ensureClassifier();
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+  const AC = window.AudioContext || window.webkitAudioContext;
+  laughCtx = new AC({ sampleRate: 16000 });
+  if (laughCtx.state === "suspended") await laughCtx.resume();
+  const source = laughCtx.createMediaStreamSource(stream);
+
+  // 2s calibration for baseline noise
+  const tmpAnalyser = laughCtx.createAnalyser(); tmpAnalyser.fftSize = 1024;
+  const tmpBuf = new Float32Array(tmpAnalyser.fftSize);
+  source.connect(tmpAnalyser);
+  setStatus("Calibrating 2s… stay quiet.", "warn");
+  let sum=0, cnt=0; const t0=performance.now();
+  while (performance.now()-t0 < 2000){
+    tmpAnalyser.getFloatTimeDomainData(tmpBuf);
+    let ss=0; for (let i=0;i<tmpBuf.length;i++) ss+=tmpBuf[i]*tmpBuf[i];
+    sum += Math.sqrt(ss/tmpBuf.length); cnt++;
+    await new Promise(r=>setTimeout(r, 50));
+  }
+  baseRMS = cnt? (sum/cnt) : 0;
+  try{ source.disconnect(tmpAnalyser); }catch{}
+  setStatus("Go! Laugh for 10s!", "ok");
+
+  // meters + ring buffer for model
+  startRmsMeter(source);
+  ring = new Float32Array(16000); ridx=0; need = ring.length;
+  procNode = laughCtx.createScriptProcessor(16384, 1, 1);
+  source.connect(procNode); procNode.connect(laughCtx.destination);
+
+  // scoring buffers
+  let frames=0, laughSum=0, penalty=0, streak=0, streakBonus=0;
+  emaPct=0;
+
+  running=true;
+  let t=0, T=10_000, dt=250;
+
+  procNode.onaudioprocess = (e) => {
+    const x = e.inputBuffer.getChannelData(0);
+    for (let i=0;i<x.length;i++){ ring[ridx++] = x[i]; if (ridx===ring.length) ridx=0; }
+  };
+
+  // main loop @ 4 Hz
+  const loop = () => {
+    if (!running) return;
+
+    // shout penalty from current RMS
+    analyser.getFloatTimeDomainData(meterBuf);
+    let s=0; for (let i=0;i<meterBuf.length;i++) s+=meterBuf[i]*meterBuf[i];
+    const rms = Math.sqrt(s/meterBuf.length);
+    const thr = baseRMS + 0.10;
+    if (rms > thr) penalty += Math.min(0.03, rms - thr);
+
+    // 1s slice
+    const out = new Float32Array(ring.length);
+    const tail = ring.length - ridx;
+    out.set(ring.subarray(ridx), 0);
+    out.set(ring.subarray(0, ridx), tail);
+
+    // classify (sync)
+    let results=[]; try { results = audioClassifier.classify(out, laughCtx.sampleRate); } catch(err){ log("classify error: "+(err?.message||err)); }
+    const cats = results?.[0]?.classifications?.[0]?.categories || [];
+    const top5 = [...cats].sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,5)
+      .map(c => `${(c.score*100).toFixed(1)}% ${c.categoryName}`).join(" | ");
+    log(top5 || "(no cats)");
+
+    // laughter prob
+    let p=0; for (const c of cats) if (c?.categoryName && laughLabel(c.categoryName)) p+= c.score||0;
+    p = Math.max(0, Math.min(1, p));
+
+    // streaks: keep it fun—> extra points if you keep laughing
+    if (p >= 0.6) { streak += 1; if (streak%4===0) streakBonus += 1; } // +1 bonus per ~1 s sustained (4 ticks)
+    else { streak = 0; }
+
+    // EMA smoothing for the UI
+    emaPct = EMA_ALPHA*(p*100) + (1-EMA_ALPHA)*emaPct;
+
+    // accumulate
+    laughSum += p; frames++;
+
+    // JoyRank formula (fair + simple):
+    // base = 100 * mean(laughter)
+    // penalty = 15 * loudPenalty
+    // bonus = streakBonus * 2
+    const base = 100 * (laughSum/frames);
+    const joy = Math.max(0, Math.round(base - 15*penalty + 2*streakBonus));
+
+    $("#laughTxt").textContent = "Laughter " + (p*100).toFixed(1) + "%";
+    $("#laughBar").style.width = (p*100).toFixed(1) + "%";
+    $("#happyTxt").textContent = "JoyRank " + joy;
+    $("#happyBar").style.width = Math.min(100, joy) + "%";
+
+    t += dt;
+    $("#t").textContent = (t/1000).toFixed(1);
+
+    if (t >= T){
+      running=false; $("#stop").disabled=true; $("#again").disabled=false;
+      setStatus("Finished.", "");
+      const finalJoy = Math.max(0, Math.round(100*(laughSum/frames) - 15*penalty + 2*streakBonus));
+      saveScore("laugh", playerName, finalJoy);
+      return;
+    }
+    setTimeout(loop, dt);
+  };
+  loop();
+}
+
+/* ========================= S H A K E  (device motion) ========================= */
+let haveMotion=false, lastTS=0, accE=0, rotE=0, accLive=0, rotLive=0, timerId=0;
+
+function cleanupShake(){
+  try{ window.removeEventListener("devicemotion", onMotion, { passive:true }); }catch{}
+  clearTimeout(timerId);
+}
+function onMotion(e){
+  haveMotion=true;
+  const now = (e.timeStamp && Number.isFinite(e.timeStamp)) ? e.timeStamp : performance.now();
+  let dt = lastTS ? (now - lastTS)/1000 : 0; if (dt <= 0 || dt > 0.25) dt = 0.02;
+  lastTS = now;
+
+  const a = (()=>{ // linear accel magnitude
+    const A=e.acceleration, G=e.accelerationIncludingGravity, g0=9.80665;
+    let ax=0,ay=0,az=0, useG=false;
+    if (A && A.x!==null){ ax=A.x||0; ay=A.y||0; az=A.z||0; }
+    else if (G && G.x!==null){ ax=G.x||0; ay=G.y||0; az=G.z||0; useG=true; }
+    const mag = Math.hypot(ax,ay,az);
+    return useG ? Math.max(0, Math.abs(mag - g0)) : mag;
+  })();
+
+  const rDeg = (()=>{ const r=e.rotationRate||{}; return Math.hypot(r.alpha||0, r.beta||0, r.gamma||0); })();
+  const rRad = rDeg * Math.PI/180;
+
+  accE += (a*a)*dt; rotE += (rRad*rRad)*dt;
+  accLive = a; rotLive = rDeg;
+}
+
+async function startShakeRound(playerName){
+  setStatus("Requesting motion…");
+  $("#permInfo").textContent = "";
+  // iOS permission
+  if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function"){
+    const res = await DeviceMotionEvent.requestPermission();
+    $("#permInfo").textContent = "Motion perm: " + res;
+    if (res !== "granted") throw new Error("Motion access denied.");
+  }
+
+  // Reset state
+  running=true; haveMotion=false; lastTS=0; accE=0; rotE=0; accLive=0; rotLive=0;
+  window.addEventListener("devicemotion", onMotion, { passive:true });
+
+  // Warn if desktop/no sensors
+  setTimeout(()=>{ if (!haveMotion) setStatus("No motion data (desktop or disabled).", "warn"); }, 2000);
+
+  setStatus("Shake now! 10s", "ok");
+
+  // 10s loop @ 60fps visual
+  let t=0, T=10_000, dt=1000/60;
+  (function loop(){
+    if (!running) return;
+    t += dt;
+    // live meters
+    $("#accTxt").textContent = `acc ${accLive.toFixed(2)} m/s²`;
+    $("#rotTxt").textContent = `rot ${rotLive.toFixed(1)} °/s`;
+    $("#accBar").style.width = clamp(accLive*6, 0, 100) + "%";
+    $("#rotBar").style.width = clamp(rotLive*0.6, 0, 100) + "%";
+
+    const shake = Math.round(accE*6 + rotE*2);
+    $("#shakeTxt").textContent = `ShakeRank ${shake}`;
+    $("#shakeBar").style.width = clamp(shake/5, 0, 100) + "%";
+    $("#t").textContent = (t/1000).toFixed(1);
+
+    if (t >= T){
+      running=false; $("#stop").disabled=true; $("#again").disabled=false;
+      setStatus("Finished.", "");
+      const finalShake = Math.round(accE*6 + rotE*2);
+      saveScore("shake", playerName, finalShake);
+      return;
+    }
+    timerId = setTimeout(loop, dt);
+  })();
+}
+</script>
+</html>
