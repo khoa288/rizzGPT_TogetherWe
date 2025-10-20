@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-50">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TogetherWe | Shake Mode</title>
+    <link href="./css/styles.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              sky: 'rgb(56 189 248)',
+              indigo: 'rgb(99 102 241)',
+              emerald: 'rgb(16 185 129)',
+              yellow: 'rgb(250 204 21)',
+              slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334152', 800: '#1e293b', 900: '#0f172a' },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background-image: url('./assets/bg-noise.png'); }
+    </style>
+  </head>
+  <body class="h-full flex flex-col text-slate-800">
+    <div id="confetti-container" class="fixed inset-0 pointer-events-none z-50"></div>
+    <header class="p-4 flex justify-between items-center max-w-4xl mx-auto w-full">
+        <a href="./index.html" class="text-sm font-medium text-slate-600 hover:text-indigo-600">&larr; Back to Menu</a>
+        <div class="flex gap-2">
+            <a href="./laugh.html" class="px-4 py-2 text-sm font-medium bg-white text-slate-700 rounded-full shadow-sm hover:bg-slate-100">Laugh</a>
+            <a href="./shake.html" class="px-4 py-2 text-sm font-bold bg-emerald-500 text-white rounded-full shadow-md">Shake</a>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-4">
+      <div class="w-full max-w-lg mx-auto space-y-4">
+        
+        <div class="p-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg ring-1 ring-slate-200/50">
+          <h1 class="text-2xl font-bold text-slate-900 mb-4 text-center">Shake Mode</h1>
+          
+          <!-- Meters -->
+          <div id="meters" class="space-y-3 mb-6">
+            <div class="meter-wrapper">
+              <span class="meter-label">Acceleration</span>
+              <div class="meter-bar"><div id="acc-bar" class="meter-fill bg-gradient-to-r from-emerald-300 to-emerald-500"></div></div>
+              <span id="acc-txt" class="meter-value">0.00 m/s²</span>
+            </div>
+            <div class="meter-wrapper">
+              <span class="meter-label">Rotation</span>
+              <div class="meter-bar"><div id="rot-bar" class="meter-fill bg-gradient-to-r from-sky-300 to-sky-500"></div></div>
+              <span id="rot-txt" class="meter-value">0.0 °/s</span>
+            </div>
+            <div class="meter-wrapper">
+              <span class="meter-label">ShakeRank</span>
+              <div class="meter-bar"><div id="shake-bar" class="meter-fill bg-gradient-to-r from-yellow-300 to-yellow-500"></div></div>
+              <span id="shake-txt" class="meter-value">0</span>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex items-center justify-center gap-4 mb-4">
+            <button id="start-btn" class="btn btn-primary">Start 10s</button>
+            <button id="stop-btn" class="btn" disabled>Stop</button>
+            <button id="again-btn" class="btn" disabled>Play Again</button>
+          </div>
+          <div id="status-text" class="text-center text-slate-500 min-h-[1.5rem]">Ready.</div>
+        </div>
+        
+        <div class="p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg ring-1 ring-slate-200/50 flex flex-col sm:flex-row items-center gap-3">
+            <label for="name-input" class="font-medium text-slate-700">Display Name:</label>
+            <input id="name-input" class="input flex-grow" type="text" placeholder="Your game name" maxlength="16" />
+            <button id="save-name-btn" class="btn btn-secondary w-full sm:w-auto">Save</button>
+            <span id="name-status" class="text-sm text-slate-500"></span>
+        </div>
+
+        <div class="text-center text-xs text-slate-400 font-mono" id="origin-status"></div>
+      </div>
+    </main>
+
+    <script type="module">
+        import { initShakePage } from './js/shake.js';
+        initShakePage();
+    </script>
+  </body>
+</html>

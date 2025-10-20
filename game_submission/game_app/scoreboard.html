@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-50">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TogetherWe | Scoreboard</title>
+    <link href="./css/styles.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              sky: 'rgb(56 189 248)',
+              indigo: 'rgb(99 102 241)',
+              emerald: 'rgb(16 185 129)',
+              yellow: 'rgb(250 204 21)',
+              slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334152', 800: '#1e293b', 900: '#0f172a' },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background-image: url('./assets/bg-noise.png'); }
+    </style>
+  </head>
+  <body class="h-full flex flex-col text-slate-800">
+    <header class="p-4 max-w-4xl mx-auto w-full">
+        <a href="./index.html" class="text-sm font-medium text-slate-600 hover:text-indigo-600">&larr; Back to Menu</a>
+    </header>
+
+    <main class="flex-grow p-4">
+      <div class="w-full max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-slate-900 mb-2 text-center">Local Leaderboards</h1>
+        <p class="text-center text-slate-500 mb-8">Top 10 scores are saved on this device. They are not shared.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          <!-- Laugh Scores -->
+          <div>
+            <h2 class="text-2xl font-bold text-sky-600 mb-4 text-center">Top 10 Laughers</h2>
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg ring-1 ring-slate-200/50 p-4">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-slate-200">
+                    <th class="p-2 text-left font-semibold text-slate-600 w-8">#</th>
+                    <th class="p-2 text-left font-semibold text-slate-600">Name</th>
+                    <th class="p-2 text-right font-semibold text-slate-600">JoyRank</th>
+                    <th class="p-2 text-right font-semibold text-slate-600">When</th>
+                  </tr>
+                </thead>
+                <tbody id="laugh-scores-body">
+                  <!-- Rows will be injected by scoreboard.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Shake Scores -->
+          <div>
+            <h2 class="text-2xl font-bold text-emerald-600 mb-4 text-center">Top 10 Shakers</h2>
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg ring-1 ring-slate-200/50 p-4">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-slate-200">
+                    <th class="p-2 text-left font-semibold text-slate-600 w-8">#</th>
+                    <th class="p-2 text-left font-semibold text-slate-600">Name</th>
+                    <th class="p-2 text-right font-semibold text-slate-600">ShakeRank</th>
+                    <th class="p-2 text-right font-semibold text-slate-600">When</th>
+                  </tr>
+                </thead>
+                <tbody id="shake-scores-body">
+                  <!-- Rows will be injected by scoreboard.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+  <script type="module" src="./js/scoreboard.js"></script>
+</html>

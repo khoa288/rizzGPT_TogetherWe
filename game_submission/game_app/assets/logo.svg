@@ -1,0 +1,10 @@
+<svg width="200" height="60" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <defs>
+    <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/> <!-- sky-400 -->
+      <stop offset="100%" stop-color="#6366f1"/> <!-- indigo-500 -->
+    </linearGradient>
+  </defs>
+  <text x="50%" y="35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="bold" fill="url(#logoGradient)" text-anchor="middle">TogetherWe</text>
+  <path d="M 70 48 Q 100 60 130 48" stroke="#facc15" stroke-width="3" stroke-linecap="round" fill="none"/> <!-- yellow-400 -->
+</svg>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TogetherWe | About</title>
+    <link href="./css/styles.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              sky: 'rgb(56 189 248)',
+              indigo: 'rgb(99 102 241)',
+              emerald: 'rgb(16 185 129)',
+              yellow: 'rgb(250 204 21)',
+              slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334152', 800: '#1e293b', 900: '#0f172a' },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background-image: url('./assets/bg-noise.png'); }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800">
+    <header class="p-4 max-w-4xl mx-auto w-full">
+        <a href="./index.html" class="text-sm font-medium text-slate-600 hover:text-indigo-600">&larr; Back to Menu</a>
+    </header>
+
+    <main class="flex-grow p-4">
+        <div class="w-full max-w-3xl mx-auto bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg ring-1 ring-slate-200/50 p-8">
+            <h1 class="text-3xl font-bold text-slate-900 mb-4">About TogetherWe</h1>
+            <div class="prose prose-slate max-w-none">
+                <p>TogetherWe is a small experiment in creating joyful micro-interactions that can serve as brief, positive interruptions in our day. The goal is to raise awareness about mental well-being through simple, accessible activities: laughter and movement.</p>
+                
+                <h2 class="text-2xl font-bold text-slate-800 mt-8">The Social Context</h2>
+                <p>Mental health challenges are universal, but access to support varies greatly. This project highlights the situations in Vietnam and Australia as examples of a global concern.</p>
+                <ul>
+                    <li>In <strong>Vietnam</strong>, a 2023 survey found that 1 in 5 adolescents (21.7%) reported a mental health problem in the past year, with anxiety being particularly prevalent (18.6%). However, only about 8.4% of those with a problem had accessed support services. [1, 2]</li>
+                    <li>In <strong>Australia</strong>, recent data from 2020-22 shows that approximately 1 in 5 people (22%) aged 16-85 experienced a mental disorder in the past year, with anxiety affecting 17% of the population. [3, 4]</li>
+                </ul>
+                
+                <h2 class="text-2xl font-bold text-slate-800 mt-8">The Power of Laughter & Movement</h2>
+                <p>While technology is not a substitute for professional care, it can help promote behaviors known to support well-being. The two modes in this game are based on established principles:</p>
+                <ul>
+                    <li><strong>Movement:</strong> Large-scale reviews confirm that physical exercise, especially brisk aerobic activity, is a highly effective, well-tolerated treatment for improving mood and reducing symptoms of depression. [5, 6] The "Shake" mode encourages a brief burst of such activity.</li>
+                    <li><strong>Laughter:</strong> Meta-analyses have shown that laughter and humor-based interventions can significantly reduce both depression and anxiety across various populations. [7] The "Laugh" mode uses on-device machine learning to encourage and "score" genuine laughter. [8]</li>
+                </ul>
+
+                <div class="mt-8 p-4 bg-indigo-50 border-l-4 border-indigo-400 text-indigo-800 rounded-r-lg">
+                    <strong>Disclaimer:</strong> This game is for informational and entertainment purposes only. It is not a medical tool and does not provide medical advice. If you are concerned about your mental health, please seek guidance from a qualified healthcare professional.
+                </div>
+
+                <h3 class="text-xl font-bold text-slate-800 mt-8">References</h3>
+                <ol class="text-sm list-decimal list-inside space-y-2 text-slate-600">
+                    <li>Viet Nam Adolescent Mental Health Survey (V-NAMHS), 2023. qcmhr.org.</li>
+                    <li>World Health Organization (WHO), "Mental health in Viet Nam".</li>
+                    <li>Australian Institute of Health and Welfare (AIHW), "Mental health," updated May 20, 2025.</li>
+                    <li>Australian Bureau of Statistics (ABS), "National Study of Mental Health and Wellbeing."</li>
+                    <li>BMJ, "Exercise for depression: umbrella review and meta-analysis of 14,170 participants from 218 randomised controlled trials," 2024.</li>
+                    <li>PubMed, "The effectiveness of physical activity and exercise for treating depression in adults: a meta-analysis of 127 randomized controlled trials," 2024.</li>
+                    <li>PubMed, "The effect of laughter and humor interventions on depression, anxiety, and stress in adults: A meta-analysis," 2019.</li>
+                    <li>Google AI for Developers, "MediaPipe Audio Classifier" & YAMNet documentation.</li>
+                </ol>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
